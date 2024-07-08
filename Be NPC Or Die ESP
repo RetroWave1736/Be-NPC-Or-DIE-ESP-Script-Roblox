@@ -1,0 +1,133 @@
+-- Define the highlight size and colors
+local highlightSize = 20
+local enemyColor = Color3.fromRGB(255, 0, 0)   -- Red color for enemies
+local teammateColor = Color3.fromRGB(0, 0, 255)  -- Blue color for teammates
+
+local espEnabled = false  -- Start with ESP disabled by default
+
+-- Function to create a highlight above a player's head
+local function createPlayerHighlight(player)
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        -- Remove existing highlight
+        local existingHighlight = player.Character.Head:FindFirstChild("PlayerHighlight")
+        if existingHighlight then
+            existingHighlight:Destroy()
+        end
+
+        -- Create a BillboardGui for the highlight
+        local highlight = Instance.new("BillboardGui")
+        highlight.Name = "PlayerHighlight"
+        highlight.Size = UDim2.new(0, highlightSize, 0, highlightSize)
+        highlight.AlwaysOnTop = true
+        highlight.LightInfluence = 1
+        highlight.Parent = player.Character.Head
+
+        -- Create a Frame to display the highlight
+        local highlightFrame = Instance.new("Frame")
+        highlightFrame.Size = UDim2.new(1, 0, 1, 0)
+        highlightFrame.BackgroundColor3 = enemyColor  -- Default to enemy color
+        highlightFrame.BackgroundTransparency = 0.5
+        highlightFrame.BorderSizePixel = 0
+        highlightFrame.Parent = highlight
+
+        -- Check if the player is a teammate or enemy
+        local localPlayer = game.Players.LocalPlayer
+        if player.TeamColor == localPlayer.TeamColor then
+            highlightFrame.BackgroundColor3 = teammateColor  -- Set to teammate color if they are on the same team
+        end
+
+        -- Position the highlight above the player's head
+        highlight.StudsOffset = Vector3.new(0, 1, 0)  -- Offset from the head position
+
+        -- Update the highlight color if the player's team changes
+        player:GetPropertyChangedSignal("Team"):Connect(function()
+            if player.TeamColor == localPlayer.TeamColor then
+                highlightFrame.BackgroundColor3 = teammateColor
+            else
+                highlightFrame.BackgroundColor3 = enemyColor
+            end
+        end)
+        
+        -- Enable or disable the highlight based on the espEnabled state
+        highlight.Enabled = espEnabled
+    end
+end
+
+-- Function to update ESP highlights for all players
+local function updateESP()
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer then
+            createPlayerHighlight(player)
+        end
+    end
+end
+
+-- Function to toggle the ESP on and off
+local function toggleESP()
+    espEnabled = not espEnabled  -- Toggle the state
+    
+    -- Enable or disable highlights based on espEnabled state
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player ~= game.Players.LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local highlight = player.Character.Head:FindFirstChild("PlayerHighlight")
+            if highlight then
+                highlight.Enabled = espEnabled
+            end
+        end
+    end
+end
+
+-- Function to create the ESP toggle button
+local function createESPButton()
+    -- Wait for PlayerGui to ensure it exists
+    local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+    -- Check if the button already exists to avoid duplicates
+    if playerGui:FindFirstChild("ESPControlGui") then
+        return
+    end
+
+    -- Create a ScreenGui to hold the button
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ESPControlGui"
+    screenGui.Parent = playerGui
+
+    -- Create a TextButton for the ESP toggle
+    local button = Instance.new("TextButton")
+    button.Name = "ESPButton"
+    button.Text = "ESP: OFF"
+    button.Size = UDim2.new(0, 120, 0, 50)
+    button.Position = UDim2.new(1, -140, 1, -60)  -- Bottom right corner positioning
+    button.AnchorPoint = Vector2.new(1, 1)
+    button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Parent = screenGui  -- Place in the ScreenGui
+
+    -- Toggle ESP when clicked
+    button.MouseButton1Click:Connect(function()
+        toggleESP()
+        button.Text = espEnabled and "ESP: ON" or "ESP: OFF"
+    end)
+end
+
+-- Create ESP toggle button
+createESPButton()
+
+-- Listen for new players and create highlights for them
+game.Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        createPlayerHighlight(player)
+    end)
+end)
+
+-- Update ESP highlights every frame if ESP is enabled
+game:GetService("RunService").RenderStepped:Connect(function()
+    if espEnabled then
+        updateESP()
+    end
+end)
+
+-- Ensure the button is recreated when the local player respawns
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+    createESPButton()
+end)
